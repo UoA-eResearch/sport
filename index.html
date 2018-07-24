@@ -1,0 +1,240 @@
+<html>
+  <head>
+    <title>Sport Venue Map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/leaflet.css" integrity="sha256-iYUgmrapfDGvBrePJPrMWQZDcObdAcStKBpjP3Az+3s=" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/leaflet.js" integrity="sha256-CNm+7c26DTTCGRQkM9vp7aP85kHFMqs9MhPEuytF+fQ=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-overpass-layer@2.8.2/dist/OverPassLayer.css" />
+    <script src="https://cdn.rawgit.com/UoA-eResearch/leaflet-overpass-layer/dc8dd9b02a4e1b213da7ac01ee960301556c0369/dist/OverPassLayer.bundle.js"></script>
+    <script src="https://unpkg.com/osmtogeojson@2.2.12/osmtogeojson.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js"></script>
+    <script src="https://unpkg.com/leaflet-spin@1.1.0/leaflet.spin.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet-geosearch@latest/dist/bundle.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@latest/assets/css/leaflet.css">
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBhSHcGYySVS9nLEZ1mF73Gv_9z41rNOXs"></script>
+    <script src="https://unpkg.com/leaflet-svg-shape-markers@1.0.0/dist/leaflet-svg-shape-markers.min.js"></script>
+    <script src="https://unpkg.com/leaflet-providers@1.3.0/leaflet-providers.js"></script>
+    <link rel="stylesheet" href="style.css"/>
+  </head>
+  <body>
+    <h1 id="title">Sport Venue Map</h1>
+    <div id="map"></div>
+    <script>
+      var map = L.map('map', {
+        worldCopyJump: true,
+        zoomControl: false // Zoom added layer for ordering
+      }).setView([-36.8862,174.7651], 12);
+      var positron = L.tileLayer.provider('CartoDB.Positron').addTo(map);
+
+      var colors = {
+        basketball: "orange",
+        bowls: "crimson",
+        boxing: "red",
+        cricket: "coral",
+        equestrian: "brown",
+        golf: "green",
+        rugby: "darkolivegreen",
+        soccer: "olive",
+        surfing: "skyblue",
+        swimming: "blue",
+        tennis: "gold",
+        unknown: "black"
+      }
+
+      var poly = L.layerGroup();
+      var point = L.layerGroup().addTo(map);
+      var addedIds = {};
+
+      function popupHandler(popup) {
+        console.log(popup);
+        var panoElem = $(".pano", popup.popup._contentNode)[0];
+        var sv = new google.maps.StreetViewService();
+        sv.getPanorama({location: popup.popup._latlng}, function(data, status) {
+          if (status === 'OK') {
+            var pano = new google.maps.StreetViewPanorama(panoElem, {
+              position: popup.popup._latlng,
+              pov: {
+                heading: 0,
+                pitch: 0
+              },
+              zoom: 1
+            });
+          } else {
+            $(panoElem).text("No streetview for this location");
+          }
+        });
+      }
+
+      function capitilize(string) {
+        if (string) {
+          return string.replace(/_/g, " ").replace(/\w\S*/g, function(txt){
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+          });
+        }
+      }
+
+      function updateStats() {
+        var counts = {}
+        for (var i in colors) {
+          counts[i] = 0;
+        }
+        point.eachLayer(function(layer) {
+          if(map.getBounds().contains(layer.getLatLng())) {
+            if (layer.sport in counts) {
+              counts[layer.sport]++;
+            } else {
+              counts.unknown++;
+            }
+          }
+        });
+        for (var k in counts) {
+          $("#" + k + "C").text(counts[k]);
+        }
+        count = 0;
+      }
+
+      var opl = new L.OverPassLayer({
+        query: '(node["sport"]({{bbox}});way["sport"]({{bbox}});relation["sport"]({{bbox}}););out body;>;out skel qt;',
+        minZoom: 10,
+        beforeRequest: function() {
+          map.spin(true);
+        },
+        afterRequest: function() {
+          map.spin(false);
+        },
+        attribution: 'POI via <a href="http://www.overpass-api.de/">Overpass API</a>',
+        onSuccess: function(data) {
+          console.log(data);
+          var geoJSON = osmtogeojson(data);
+          console.log(geoJSON);
+          function onEachFeature(feature, layer) {
+            var tags = feature.properties.tags;
+            var outString = "<b>" + tags.name + "</b><div>Sport: " + capitilize(tags.sport) + "</div><div class='pano'></div>";
+            layer.bindPopup(outString, {
+              maxWidth: "auto"
+            }).on('popupopen', popupHandler);
+            var latlng;
+            if (feature.geometry.type === "Polygon" || feature.geometry.type == "MultiPolygon") {
+              var center = L.latLngBounds(feature.geometry.coordinates[0]).getCenter();
+              latlng = [center.lng, center.lat];
+            } else if (feature.geometry.type == "Point") {
+              latlng = L.GeoJSON.coordsToLatLng(feature.geometry.coordinates);
+            } else if (feature.geometry.type == "LineString") {
+              var center = L.latLngBounds(feature.geometry.coordinates).getCenter();
+              latlng = [center.lng, center.lat];
+            } else {
+              console.error("Don't know how to handle", feature);
+              return;
+            }
+            var color = colors[tags.sport.toLowerCase()];
+            if (!color) {
+              color = "black";
+            }
+            var marker = L.circleMarker(latlng, {color: color}).addTo(point);
+            marker.sport = tags.sport.toLowerCase();
+            marker.bindPopup(outString, {
+              maxWidth: "auto"
+            }).on('popupopen', popupHandler);
+            layer.addTo(poly);
+          }
+
+          L.geoJSON(geoJSON, {
+            onEachFeature: onEachFeature,
+            style: function (feature) {
+              var tags = feature.properties.tags;
+              var color = colors[tags.sport.toLowerCase()];
+              if (!color) {
+                color = "black";
+              }
+              var style = {
+                color: color
+              }
+              return style;
+            },
+            filter: function (feature, layer) {
+              var id = feature.id;
+              if (addedIds[id]) {
+                return false;
+              } else {
+                addedIds[id] = true;
+                return true;
+              }
+            },
+            pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng); // how nodes (single latlng) elements should be handled (they'll still get the click handler from onEachFeature)
+            }
+          })
+          updateStats();
+        }
+      });
+
+      map.addLayer(opl);
+
+      var baseMaps = {
+        "OSM": L.tileLayer.provider("OpenStreetMap.Mapnik"),
+        "OSM Grayscale": L.tileLayer.provider("OpenStreetMap.BlackAndWhite"),
+        "CartoDB Positron": positron,
+        "CartoDB Dark Matter": L.tileLayer.provider("CartoDB.DarkMatter"),
+        "Wikimedia": L.tileLayer.provider("Wikimedia")
+      }
+
+      L.control.layers(baseMaps, null, {position: "topleft"}).addTo(map);
+      
+      $(".leaflet-control-layers-base").prepend("<b>Basemaps</b>");
+//      $(".leaflet-control-layers-overlays").prepend("<b>Overlays</b>");
+
+      L.control.zoom({
+           position:'topleft'
+      }).addTo(map);
+
+      var geoSearch = new GeoSearch.GeoSearchControl({
+        provider: new GeoSearch.GoogleProvider({
+          params: {
+            key: 'AIzaSyBhSHcGYySVS9nLEZ1mF73Gv_9z41rNOXs',
+          }
+        }),
+        style: 'button',
+        autoComplete: true,
+        autoCompleteDelay: 250,
+        autoClose: true,
+        position: "topleft"
+      }).addTo(map);
+
+      map.on('zoomend', function() {
+        console.log("zoomed to " + map.getZoom());
+        if (map.getZoom() < 16){
+          map.removeLayer(poly);
+          map.addLayer(point);
+          console.log("switching to markers");
+        } else {
+          map.removeLayer(point);
+          map.addLayer(poly);
+          console.log("switching to polys");
+        }
+      });
+
+      map.on("moveend", function () {
+        console.log("moveend");
+        updateStats();
+      });
+
+      var legend = L.control({position: 'topleft'});
+
+      legend.onAdd = function (map) {
+          var div = L.DomUtil.create('div', 'info legend');
+          div.innerHTML += "<h4>Sport venues</h4>";
+          var keys = Object.keys(colors);
+          keys.sort();
+          for (var i in keys) {
+            var k = keys[i];
+            var color = colors[k];
+            div.innerHTML += '<i class="circle" style="background:' + color + ';border-color:' + color + '"></i> ' + capitilize(k) + ': <span id="' + k + 'C"></span><br>';
+          }
+
+          return div;
+      };
+
+      legend.addTo(map);
+    </script>
+  </body>
+</html>
