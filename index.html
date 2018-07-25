@@ -44,8 +44,9 @@
         unknown: "black"
       }
 
+      var sports = L.layerGroup().addTo(map);
       var poly = L.layerGroup();
-      var point = L.layerGroup().addTo(map);
+      var point = L.layerGroup().addTo(sports);
       var addedIds = {};
 
       function popupHandler(popup) {
@@ -198,13 +199,18 @@
         "OSM Grayscale": L.tileLayer.provider("OpenStreetMap.BlackAndWhite"),
         "CartoDB Positron": positron,
         "CartoDB Dark Matter": L.tileLayer.provider("CartoDB.DarkMatter"),
+        "ESRI WorldImagery": L.tileLayer.provider("Esri.WorldImagery"),
         "Wikimedia": L.tileLayer.provider("Wikimedia")
       }
+      
+      var overlays = {
+        "Sport venues": sports
+      }
 
-      L.control.layers(baseMaps, null, {position: "topleft"}).addTo(map);
+      L.control.layers(baseMaps, overlays, {position: "topleft"}).addTo(map);
       
       $(".leaflet-control-layers-base").prepend("<b>Basemaps</b>");
-//      $(".leaflet-control-layers-overlays").prepend("<b>Overlays</b>");
+      $(".leaflet-control-layers-overlays").prepend("<b>Overlays</b>");
 
       L.control.zoom({
            position:'topleft'
@@ -226,12 +232,12 @@
       map.on('zoomend', function() {
         console.log("zoomed to " + map.getZoom());
         if (map.getZoom() < 16){
-          map.removeLayer(poly);
-          map.addLayer(point);
+          sports.removeLayer(poly);
+          sports.addLayer(point);
           console.log("switching to markers");
         } else {
-          map.removeLayer(point);
-          map.addLayer(poly);
+          sports.removeLayer(point);
+          sports.addLayer(poly);
           console.log("switching to polys");
         }
       });
