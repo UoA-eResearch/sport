@@ -37,6 +37,7 @@
         rugby: "darkolivegreen",
         sailing: "aqua",
         soccer: "olive",
+        stadium: "hotpink",
         surfing: "skyblue",
         swimming: "blue",
         tennis: "gold",
@@ -96,7 +97,7 @@
       }
 
       var opl = new L.OverPassLayer({
-        query: '(node["sport"]({{bbox}});way["sport"]({{bbox}});relation["sport"]({{bbox}}););out body;>;out skel qt;',
+        query: '(node["leisure"="stadium"]({{bbox}});way["leisure"="stadium"]({{bbox}});relation["leisure"="stadium"]({{bbox}});node["sport"]({{bbox}});way["sport"]({{bbox}});relation["sport"]({{bbox}}););out body;>;out skel qt;',
         minZoom: 10,
         beforeRequest: function() {
           map.spin(true);
@@ -117,7 +118,7 @@
             if (tags.sport == "motor") {
               tags.sport = "car_racing";
             }
-            var outString = "<b>" + tags.name + "</b><div>Sport: " + capitilize(tags.sport) + "</div><div class='pano'></div>";
+            var outString = "<b>" + tags.name + "</b><div>Sport: " + capitilize(tags.sport) + "</div><div>Type: " + capitilize(tags.leisure) + "</div><div class='pano'></div>";
             layer.bindPopup(outString, {
               maxWidth: "auto"
             }).on('popupopen', popupHandler);
@@ -134,12 +135,21 @@
               console.error("Don't know how to handle", feature);
               return;
             }
-            var color = colors[tags.sport.toLowerCase()];
+            var color;
+            if (tags.leisure == "stadium") {
+              color = colors.stadium;
+            } else if (tags.sport) {
+              color = colors[tags.sport.toLowerCase()];
+            }
             if (!color) {
               color = "black";
             }
             var marker = L.circleMarker(latlng, {color: color}).addTo(point);
-            marker.sport = tags.sport.toLowerCase();
+            if (tags.leisure == "stadium") {
+              marker.sport = "stadium";
+            } else if (tags.sport) {
+              marker.sport = tags.sport.toLowerCase();
+            }
             marker.bindPopup(outString, {
               maxWidth: "auto"
             }).on('popupopen', popupHandler);
@@ -150,7 +160,12 @@
             onEachFeature: onEachFeature,
             style: function (feature) {
               var tags = feature.properties.tags;
-              var color = colors[tags.sport.toLowerCase()];
+              var color;
+              if (tags.leisure == "stadium") {
+                color = colors.stadium;
+              } else if (tags.sport) {
+                color = colors[tags.sport.toLowerCase()];
+              }
               if (!color) {
                 color = "black";
               }
