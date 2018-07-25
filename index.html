@@ -161,6 +161,12 @@
             onEachFeature: onEachFeature,
             style: function (feature) {
               var tags = feature.properties.tags;
+              if (tags.sport == "horse_racing") {
+                tags.sport = "equestrian";
+              }
+              if (tags.sport == "motor") {
+                tags.sport = "car_racing";
+              }
               var color;
               if (tags.leisure == "stadium") {
                 color = colors.stadium;
