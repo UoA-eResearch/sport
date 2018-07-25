@@ -30,10 +30,12 @@
         basketball: "orange",
         bowls: "crimson",
         boxing: "red",
+        car_racing: "gray",
         cricket: "coral",
         equestrian: "brown",
         golf: "green",
         rugby: "darkolivegreen",
+        sailing: "aqua",
         soccer: "olive",
         surfing: "skyblue",
         swimming: "blue",
@@ -109,6 +111,12 @@
           console.log(geoJSON);
           function onEachFeature(feature, layer) {
             var tags = feature.properties.tags;
+            if (tags.sport == "horse_racing") {
+              tags.sport = "equestrian";
+            }
+            if (tags.sport == "motor") {
+              tags.sport = "car_racing";
+            }
             var outString = "<b>" + tags.name + "</b><div>Sport: " + capitilize(tags.sport) + "</div><div class='pano'></div>";
             layer.bindPopup(outString, {
               maxWidth: "auto"
